@@ -31,8 +31,7 @@ STATE_FILE = Path("seen.json")
 MAX_SEEN = 500  # how many past post IDs to remember
 X_DOMAIN = re.compile(r"https?://(?:www\.|mobile\.)?(?:x|twitter)\.com", re.IGNORECASE)
 ATOM = "{http://www.w3.org/2005/Atom}"
-USER_AGENT = "Mozilla/5.0 (compatible; x-to-discord/1.0)"
-
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
 
 def to_vx(url: str) -> str:
     return X_DOMAIN.sub("https://vxtwitter.com", url, count=1)
