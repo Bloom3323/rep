@@ -24,14 +24,16 @@ from datetime import datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
-FEED_URL = os.environ["FEED_URL"]
-WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
+FEED_URL = os.environ["FEED_URL"].strip()
+# One or more webhook links, separated by new lines, spaces or commas
+WEBHOOK_URLS = [u for u in re.split(r"[\s,]+", os.environ["DISCORD_WEBHOOK_URL"]) if u]
 
 STATE_FILE = Path("seen.json")
 MAX_SEEN = 500  # how many past post IDs to remember
 X_DOMAIN = re.compile(r"https?://(?:www\.|mobile\.)?(?:x|twitter)\.com", re.IGNORECASE)
 ATOM = "{http://www.w3.org/2005/Atom}"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
+
 
 def to_vx(url: str) -> str:
     return X_DOMAIN.sub("https://vxtwitter.com", url, count=1)
@@ -97,16 +99,29 @@ def save_seen(seen: list) -> None:
 
 
 def post_to_discord(title: str, link: str) -> None:
+    """Sends the post to every webhook. Fails only if no webhook worked."""
     title = " ".join(title.split())
     content = f"**{title}**\n{link}" if title else link
     if len(content) > 2000:  # Discord's message limit
         keep = 2000 - len(link) - 10
         content = f"**{title[:keep]}…**\n{link}"
 
+    sent = 0
+    for n, url in enumerate(WEBHOOK_URLS, start=1):
+        try:
+            send_one(url, content)
+            sent += 1
+        except Exception as err:  # one broken webhook shouldn't stop the others
+            print(f"Webhook #{n} failed: {err}")
+    if sent == 0:
+        raise RuntimeError("Could not post to any webhook")
+
+
+def send_one(webhook_url: str, content: str) -> None:
     body = json.dumps({"content": content, "allowed_mentions": {"parse": []}}).encode()
     for _ in range(5):
         req = urllib.request.Request(
-            WEBHOOK_URL,
+            webhook_url,
             data=body,
             headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
             method="POST",
